@@ -135,6 +135,18 @@ impl Device {
         })
     }
 
+    /// Returns an identifer string for the device
+    pub fn name(&self) -> Result<&CStr> {
+        let max_len = 256;
+        let name = [0; 256].as_mut_ptr();
+
+        unsafe { lift(ll::cuDeviceGetName(name, max_len, self.handle))? }
+
+        let name = unsafe { CStr::from_ptr(name) };
+
+        Ok(name)
+    }
+
     /// Returns the total amount of (non necessarily free) memory, in bytes,
     /// that the device has
     pub fn total_memory(&self) -> Result<usize> {
