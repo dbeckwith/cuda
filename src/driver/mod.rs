@@ -14,8 +14,11 @@ mod ll;
 
 /// A CUDA "block"
 pub struct Block {
+    /// The width of the block in threads
     pub x: u32,
+    /// The height of the block in threads
     pub y: u32,
+    /// The depth of the block in threads
     pub z: u32,
 }
 
@@ -704,8 +707,11 @@ impl<'ctx, 'm> Function<'ctx, 'm> {
 
 /// A CUDA "grid"
 pub struct Grid {
+    /// The width of the grid in blocks
     pub x: u32,
+    /// The height of the grid in blocks
     pub y: u32,
+    /// The depth of the grid in blocks
     pub z: u32,
 }
 
