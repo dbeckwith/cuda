@@ -90,7 +90,7 @@ impl Context {
 impl Drop for Context {
     fn drop(&mut self) {
         if !self.defused {
-            unsafe { lift(ll::cuCtxDestroy_v2(self.handle)).unwrap() }
+            let _ignored = unsafe { lift(ll::cuCtxDestroy_v2(self.handle)) };
         }
     }
 }
@@ -758,7 +758,7 @@ impl<'ctx> Module<'ctx> {
 
 impl<'ctx> Drop for Module<'ctx> {
     fn drop(&mut self) {
-        unsafe { lift(ll::cuModuleUnload(self.handle)).unwrap() }
+        let _ignored = unsafe { lift(ll::cuModuleUnload(self.handle)) };
     }
 }
 
