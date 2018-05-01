@@ -14,9 +14,9 @@ mod ll;
 
 /// A CUDA "block"
 pub struct Block {
-    x: u32,
-    y: u32,
-    z: u32,
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
 }
 
 impl Block {
@@ -704,9 +704,9 @@ impl<'ctx, 'm> Function<'ctx, 'm> {
 
 /// A CUDA "grid"
 pub struct Grid {
-    x: u32,
-    y: u32,
-    z: u32,
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
 }
 
 impl Grid {
