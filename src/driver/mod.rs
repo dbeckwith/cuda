@@ -804,6 +804,59 @@ pub enum Direction {
     HostToDevice,
 }
 
+// TODO should this be a method of `Context`?
+/// Allocate `n` bytes of memory on the device
+pub unsafe fn allocate(n: usize) -> Result<*mut u8> {
+    let mut d_ptr = 0;
+
+    lift(ll::cuMemAlloc_v2(&mut d_ptr, n))?;
+
+    Ok(d_ptr as *mut u8)
+}
+
+/// Copy `n` bytes of memory from `src` to `dst`
+///
+/// `direction` indicates where `src` and `dst` are located (device or host)
+pub unsafe fn copy<T>(src: *const T,
+                      dst: *mut T,
+                      count: usize,
+                      direction: Direction)
+                      -> Result<()> {
+    use self::Direction::*;
+
+    let bytes = count * mem::size_of::<T>();
+
+    lift(match direction {
+        DeviceToHost => ll::cuMemcpyDtoH_v2(dst as *mut _, src as u64, bytes),
+        HostToDevice => ll::cuMemcpyHtoD_v2(dst as u64, src as *const _, bytes),
+    })?;
+
+    Ok(())
+}
+
+// TODO same question as `allocate`
+/// Free the memory pointed to by `ptr`
+pub unsafe fn deallocate(ptr: *mut u8) -> Result<()> {
+    lift(ll::cuMemFree_v2(ptr as u64))
+}
+
+/// Initialize the CUDA runtime
+pub fn initialize() -> Result<()> {
+    // TODO expose
+    let flags = 0;
+
+    unsafe { lift(ll::cuInit(flags)) }
+}
+
+/// Returns the version of the CUDA runtime
+pub fn version() -> Result<i32> {
+    let mut version = 0;
+
+    unsafe { lift(ll::cuDriverGetVersion(&mut version))? }
+
+    Ok(version)
+}
+
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub enum Error {
@@ -867,57 +920,77 @@ pub enum Error {
     UnsupportedLimit,
 }
 
-// TODO should this be a method of `Context`?
-/// Allocate `n` bytes of memory on the device
-pub unsafe fn allocate(n: usize) -> Result<*mut u8> {
-    let mut d_ptr = 0;
-
-    lift(ll::cuMemAlloc_v2(&mut d_ptr, n))?;
-
-    Ok(d_ptr as *mut u8)
+impl ::std::fmt::Display for Error {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        use ::std::error::Error;
+        write!(f, "{}", self.description())
+    }
 }
 
-/// Copy `n` bytes of memory from `src` to `dst`
-///
-/// `direction` indicates where `src` and `dst` are located (device or host)
-pub unsafe fn copy<T>(src: *const T,
-                      dst: *mut T,
-                      count: usize,
-                      direction: Direction)
-                      -> Result<()> {
-    use self::Direction::*;
-
-    let bytes = count * mem::size_of::<T>();
-
-    lift(match direction {
-        DeviceToHost => ll::cuMemcpyDtoH_v2(dst as *mut _, src as u64, bytes),
-        HostToDevice => ll::cuMemcpyHtoD_v2(dst as u64, src as *const _, bytes),
-    })?;
-
-    Ok(())
-}
-
-// TODO same question as `allocate`
-/// Free the memory pointed to by `ptr`
-pub unsafe fn deallocate(ptr: *mut u8) -> Result<()> {
-    lift(ll::cuMemFree_v2(ptr as u64))
-}
-
-/// Initialize the CUDA runtime
-pub fn initialize() -> Result<()> {
-    // TODO expose
-    let flags = 0;
-
-    unsafe { lift(ll::cuInit(flags)) }
-}
-
-/// Returns the version of the CUDA runtime
-pub fn version() -> Result<i32> {
-    let mut version = 0;
-
-    unsafe { lift(ll::cuDriverGetVersion(&mut version))? }
-
-    Ok(version)
+impl ::std::error::Error for Error {
+    fn description(&self) -> &str {
+        use self::Error::*;
+        match self {
+            AlreadyAcquired => "CUDA_ERROR_ALREADY_ACQUIRED",
+            AlreadyMapped => "CUDA_ERROR_ALREADY_MAPPED",
+            ArrayIsMapped => "CUDA_ERROR_ARRAY_IS_MAPPED",
+            Assert => "CUDA_ERROR_ASSERT",
+            ContextAlreadyCurrent => "CUDA_ERROR_CONTEXT_ALREADY_CURRENT",
+            ContextAlreadyInUse => "CUDA_ERROR_CONTEXT_ALREADY_IN_USE",
+            ContextIsDestroyed => "CUDA_ERROR_CONTEXT_IS_DESTROYED",
+            Deinitialized => "CUDA_ERROR_DEINITIALIZED",
+            EccUncorrectable => "CUDA_ERROR_ECC_UNCORRECTABLE",
+            FileNotFound => "CUDA_ERROR_FILE_NOT_FOUND",
+            HardwareStackError => "CUDA_ERROR_HARDWARE_STACK_ERROR",
+            HostMemoryAlreadyRegistered => "CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED",
+            HostMemoryNotRegistered => "CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED",
+            IllegalAddress => "CUDA_ERROR_ILLEGAL_ADDRESS",
+            IllegalInstruction => "CUDA_ERROR_ILLEGAL_INSTRUCTION",
+            InvalidAddressSpace => "CUDA_ERROR_INVALID_ADDRESS_SPACE",
+            InvalidContext => "CUDA_ERROR_INVALID_CONTEXT",
+            InvalidDevice => "CUDA_ERROR_INVALID_DEVICE",
+            InvalidGraphicsContext => "CUDA_ERROR_INVALID_GRAPHICS_CONTEXT",
+            InvalidHandle => "CUDA_ERROR_INVALID_HANDLE",
+            InvalidImage => "CUDA_ERROR_INVALID_IMAGE",
+            InvalidPc => "CUDA_ERROR_INVALID_PC",
+            InvalidPtx => "CUDA_ERROR_INVALID_PTX",
+            InvalidSource => "CUDA_ERROR_INVALID_SOURCE",
+            InvalidValue => "CUDA_ERROR_INVALID_VALUE",
+            LaunchFailed => "CUDA_ERROR_LAUNCH_FAILED",
+            LaunchIncompatibleTexturing => "CUDA_ERROR_LAUNCH_INCOMPATIBLE_TEXTURING",
+            LaunchOutOfResources => "CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES",
+            LaunchTimeout => "CUDA_ERROR_LAUNCH_TIMEOUT",
+            MapFailed => "CUDA_ERROR_MAP_FAILED",
+            MisalignedAddress => "CUDA_ERROR_MISALIGNED_ADDRESS",
+            NoBinaryForGpu => "CUDA_ERROR_NO_BINARY_FOR_GPU",
+            NoDevice => "CUDA_ERROR_NO_DEVICE",
+            NotFound => "CUDA_ERROR_NOT_FOUND",
+            NotInitialized => "CUDA_ERROR_NOT_INITIALIZED",
+            NotMapped => "CUDA_ERROR_NOT_MAPPED",
+            NotMappedAsArray => "CUDA_ERROR_NOT_MAPPED_AS_ARRAY",
+            NotMappedAsPointer => "CUDA_ERROR_NOT_MAPPED_AS_POINTER",
+            NotPermitted => "CUDA_ERROR_NOT_PERMITTED",
+            NotReady => "CUDA_ERROR_NOT_READY",
+            NotSupported => "CUDA_ERROR_NOT_SUPPORTED",
+            NvlinkUncorrectable => "CUDA_ERROR_NVLINK_UNCORRECTABLE",
+            OperatingSystem => "CUDA_ERROR_OPERATING_SYSTEM",
+            OutOfMemory => "CUDA_ERROR_OUT_OF_MEMORY",
+            PeerAccessAlreadyEnabled => "CUDA_ERROR_PEER_ACCESS_ALREADY_ENABLED",
+            PeerAccessNotEnabled => "CUDA_ERROR_PEER_ACCESS_NOT_ENABLED",
+            PeerAccessUnsupported => "CUDA_ERROR_PEER_ACCESS_UNSUPPORTED",
+            PrimaryContextActive => "CUDA_ERROR_PRIMARY_CONTEXT_ACTIVE",
+            ProfilerAlreadyStarted => "CUDA_ERROR_PROFILER_ALREADY_STARTED",
+            ProfilerAlreadyStopped => "CUDA_ERROR_PROFILER_ALREADY_STOPPED",
+            ProfilerDisabled => "CUDA_ERROR_PROFILER_DISABLED",
+            ProfilerNotInitialized => "CUDA_ERROR_PROFILER_NOT_INITIALIZED",
+            SharedObjectInitFailed => "CUDA_ERROR_SHARED_OBJECT_INIT_FAILED",
+            SharedObjectSymbolNotFound => "CUDA_ERROR_SHARED_OBJECT_SYMBOL_NOT_FOUND",
+            TooManyPeers => "CUDA_ERROR_TOO_MANY_PEERS",
+            Unknown => "CUDA_ERROR_UNKNOWN",
+            UnmapFailed => "CUDA_ERROR_UNMAP_FAILED",
+            UnsupportedLimit => "CUDA_ERROR_UNSUPPORTED_LIMIT",
+        }
+    }
 }
 
 #[allow(missing_docs)]
@@ -940,9 +1013,7 @@ fn lift(e: ll::CUresult) -> Result<()> {
         CUDA_ERROR_ECC_UNCORRECTABLE => EccUncorrectable,
         CUDA_ERROR_FILE_NOT_FOUND => FileNotFound,
         CUDA_ERROR_HARDWARE_STACK_ERROR => HardwareStackError,
-        CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED => {
-            HostMemoryAlreadyRegistered
-        }
+        CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED => HostMemoryAlreadyRegistered,
         CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED => HostMemoryNotRegistered,
         CUDA_ERROR_ILLEGAL_ADDRESS => IllegalAddress,
         CUDA_ERROR_ILLEGAL_INSTRUCTION => IllegalInstruction,
@@ -962,6 +1033,8 @@ fn lift(e: ll::CUresult) -> Result<()> {
         CUDA_ERROR_LAUNCH_TIMEOUT => LaunchTimeout,
         CUDA_ERROR_MAP_FAILED => MapFailed,
         CUDA_ERROR_MISALIGNED_ADDRESS => MisalignedAddress,
+        CUDA_ERROR_NO_BINARY_FOR_GPU => NoBinaryForGpu,
+        CUDA_ERROR_NO_DEVICE => NoDevice,
         CUDA_ERROR_NOT_FOUND => NotFound,
         CUDA_ERROR_NOT_INITIALIZED => NotInitialized,
         CUDA_ERROR_NOT_MAPPED => NotMapped,
@@ -970,8 +1043,7 @@ fn lift(e: ll::CUresult) -> Result<()> {
         CUDA_ERROR_NOT_PERMITTED => NotPermitted,
         CUDA_ERROR_NOT_READY => NotReady,
         CUDA_ERROR_NOT_SUPPORTED => NotSupported,
-        CUDA_ERROR_NO_BINARY_FOR_GPU => NoBinaryForGpu,
-        CUDA_ERROR_NO_DEVICE => NoDevice,
+        CUDA_ERROR_NVLINK_UNCORRECTABLE => NvlinkUncorrectable,
         CUDA_ERROR_OPERATING_SYSTEM => OperatingSystem,
         CUDA_ERROR_OUT_OF_MEMORY => OutOfMemory,
         CUDA_ERROR_PEER_ACCESS_ALREADY_ENABLED => PeerAccessAlreadyEnabled,
@@ -988,6 +1060,5 @@ fn lift(e: ll::CUresult) -> Result<()> {
         CUDA_ERROR_UNKNOWN => Unknown,
         CUDA_ERROR_UNMAP_FAILED => UnmapFailed,
         CUDA_ERROR_UNSUPPORTED_LIMIT => UnsupportedLimit,
-        CUDA_ERROR_NVLINK_UNCORRECTABLE => NvlinkUncorrectable,
     })
 }
