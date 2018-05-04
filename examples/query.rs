@@ -17,6 +17,7 @@ fn run() -> Result<()> {
 
         println!("");
         println!("# Device {}", i);
+        println!("NAME: {}", device.name()?.to_string_lossy().into_owned());
         println!("MAX_THREADS_PER_BLOCK: {}", device.max_threads_per_block()?);
         println!("TOTAL_MEMORY: {}", device.total_memory()?);
     }

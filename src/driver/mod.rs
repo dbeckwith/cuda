@@ -2,7 +2,7 @@
 //!
 //! Reference: http://docs.nvidia.com/cuda/cuda-driver-api/
 
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::{mem, ptr, result};
 
@@ -133,6 +133,18 @@ impl Device {
             defused: false,
             handle: handle,
         })
+    }
+
+    /// Returns an identifer string for the device
+    pub fn name(&self) -> Result<&CStr> {
+        let max_len = 256;
+        let name = unsafe { CString::from_vec_unchecked(vec![0; 256]) }.into_raw();
+
+        unsafe { lift(ll::cuDeviceGetName(name, max_len, self.handle))? }
+
+        let name = unsafe { CStr::from_ptr(name) };
+
+        Ok(name)
     }
 
     /// Returns the total amount of (non necessarily free) memory, in bytes,
